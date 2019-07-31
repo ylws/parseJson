@@ -183,7 +183,7 @@ function parseInterFaceJson(val, fileName, clear) {
 }
 // 配置信息
 let prex = 'http://xx.xx.xx.xx:xx/'
-let suffix = '/v2/api-docs'
+let suffix = '/xx/xx-xx'
 let apiConfig = {
   'merchant-api': 'merchant-api',
   'cms-api': 'cms-api',
