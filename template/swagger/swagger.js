@@ -19,7 +19,7 @@ function deleteFileOrDir(path){
       // fs.rmdirSync(path);
   }
 }
-function readDirAndCreateFile(obj){
+function statDir (obj) {
   //1. fs.stat  检测是文件还是目录
   fs.stat(obj.root, function(error, stats){
     if(error){
@@ -31,7 +31,6 @@ function readDirAndCreateFile(obj){
           }
           console.log('创建目录'+obj.root+'成功');
         })
-        return false;
     } else {
       // 执行清空文件命令
       if (obj.clear && !clearcount) {
@@ -40,17 +39,20 @@ function readDirAndCreateFile(obj){
       }
     }
   })
-  // 写入文件
-  let filePath = obj.root + '/' + obj.filename + obj.type
-  fs.readFile(filePath, (err, data) => {
-    fs.writeFile(filePath, obj.data, 'utf-8', function(error){
-      if(error){
-        console.log(error);
-        return false;
-      }
-      console.log(colors('green', prex + obj.filename + suffix + '写入'+filePath+'成功\n'));
-    })
-  });
+}
+function readDirAndCreateFile(obj){
+    statDir(obj)
+    // 写入文件
+    let filePath = obj.root + '/' + obj.filename + obj.type
+    fs.readFile(filePath, (err, data) => {
+      fs.writeFile(filePath, obj.data, 'utf-8', function(error){
+        if(error){
+          console.log(error);
+          return false;
+        }
+        console.log(colors('green', prex + obj.filename + suffix + '写入'+filePath+'成功\n'));
+      })
+    });
 }  
 // 新版swaggarjson解析
 function getJson(url) {
@@ -250,4 +252,8 @@ function createApiJsonFile(obj) {
     });
   }
 }
+statDir({
+  root: root,
+  clear: false
+})
 createApiJsonFile(apiConfig)
