@@ -41,7 +41,7 @@ function readDirAndCreateFile(obj){
     }
   })
   // 写入文件
-  let filePath = obj.root + '/' + obj.filename + '.json'
+  let filePath = obj.root + '/' + obj.filename + obj.type
   fs.readFile(filePath, (err, data) => {
     fs.writeFile(filePath, obj.data, 'utf-8', function(error){
       if(error){
@@ -50,7 +50,7 @@ function readDirAndCreateFile(obj){
       }
       console.log(colors('green', prex + obj.filename + suffix + '写入'+filePath+'成功\n'));
     })
-  });  
+  });
 }  
 // 新版swaggarjson解析
 function getJson(url) {
@@ -178,7 +178,61 @@ function parseInterFaceJson(val, fileName, clear) {
     root: path.join(root),
     filename: fileName,
     data: JSON.stringify(obj, "", "\t"),
-    clear: clear ? clear : false
+    clear: clear ? clear : false,
+    type: '.json'
+  })
+  // 生成html
+  // createApiJsonFileToHtml(root, fileName, clear, obj)
+}
+// 生成html
+function createApiJsonFileToHtml (root, fileName, clear, obj) {
+  // 检测目录是否存在，并创建文件
+let html = `${
+    Object.values(obj).map((item) => {
+      return `
+          ${
+            Object.keys(item.interface).map((interfaceitem)=>{
+              return `
+                  <pre>${interfaceitem}</pre>
+                  <template>
+                    <div class="col-sm-12">
+                      <zkt-form2
+                      :fileds="fields"
+                      v-model="model"
+                      >
+                      </zkt-form2>
+                    </div>
+                  <template>
+                  <script>
+                    export default {
+                      name: '${interfaceitem}',
+                      data () {
+                        return {
+                          fields: ${JSON.stringify(item.interface[interfaceitem].fields, "", "\t")},
+                          model: ${JSON.stringify(item.interface[interfaceitem].model, "", "\t")}
+                        }
+                      }
+                    }
+                    </script>
+                    <style scoped>
+                    </style>`
+            }).join('{||||}')
+          }`
+    }).join('{||||}')
+  }`
+  html.split('{||||}').map((item) => {
+    let key = item.match(/<pre>(.*?)<\/pre>/gi)
+    if (key !== null) {
+      let vuefielname = key[0].replace(/<\/?pre>/gi, '').substr(1).replace(/\//gi, '-')
+      console.log(vuefielname, 'vuefielname')
+      readDirAndCreateFile({
+        root: path.join(root).replace(/json/gi, 'vue'),
+        filename: vuefielname,
+        data: item.replace(/<pre>(.*?)<\/pre>/gi, ''),
+        clear: clear ? clear : false,
+        type: '.vue'
+      })
+    }
   })
 }
 // 配置信息
