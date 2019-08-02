@@ -95,7 +95,7 @@ function parseInterFaceJson(val, fileName, clear) {
         fields: [],
         model: {},
         columns: [],
-        gateway: maintitle + key + ': internal,'
+        gateway: '\'' + maintitle + key + '\'' + ': \'internal\','
       }
       params = json.paths[key].get.parameters.length > 0 ? json.paths[key].get.parameters : []
       let resref = json.paths[key].get.responses[200].schema && json.paths[key].get.responses[200].schema.$ref
