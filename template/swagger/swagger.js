@@ -87,25 +87,33 @@ function parseInterFaceJson(val, fileName, clear) {
   for (let key in json.paths) {
     let temp = ''
     let params = []
+    let responseParams = ''
     if (json.paths[key].get) {
       temp = obj[json.paths[key].get.tags[0]]
       temp.interface[key] = {
         type: 'get',
         fields: [],
         model: {},
+        columns: [],
         gateway: maintitle + key + ': internal,'
       }
       params = json.paths[key].get.parameters.length > 0 ? json.paths[key].get.parameters : []
+      let resref = json.paths[key].get.responses[200].schema && json.paths[key].get.responses[200].schema.$ref
+      responseParams = resref ? resref.substr(14, resref.length) : ''
     } else if (json.paths[key].post) {
       temp = obj[json.paths[key].post.tags[0]]
       temp.interface[key] = {
         type: 'post',
         fields: [],
         model: {},
+        columns: [],
         gateway: maintitle + key + ':internal,'
       }
       params = json.paths[key].post.parameters.length > 0 ? json.paths[key].post.parameters : []
+      let resref = json.paths[key].post.responses[200].schema && json.paths[key].post.responses[200].schema.$ref
+      responseParams = resref ? resref.substr(14, resref.length) : ''
     }
+    // 入参处理
     params.map((item) => {
       if (item.required) {
         if (item.schema) {
@@ -174,6 +182,39 @@ function parseInterFaceJson(val, fileName, clear) {
         }
       }
     })
+    // 出参处理json.definitions[responseParams].properties.data  
+    // 需要区分items  和无items  无items取￥ref对应值，有，依据type类型，处理items.$ref值
+    if (responseParams) {
+      let reskey = getKey (json.definitions[responseParams] && json.definitions[responseParams].properties.data)
+      let resfinalKey = ''
+      let columnArray = ''
+      if (reskey) {
+        let res = Object.keys(json.definitions[reskey].properties).map((item) => {
+          return {
+            name: item,
+            header: json.definitions[reskey].properties[item].description ? json.definitions[reskey].properties[item].description : ''
+          }
+        })
+        temp.interface[key].columns = res
+      }
+    }
+  }
+  function getKey (reskey, resfinalKey) {
+    if (reskey) {
+      if (reskey.items) {
+        resfinalKey = reskey.items.$ref && reskey.items.$ref.substr(14, reskey.items.$ref.length)
+        if (reskey.items.type && reskey.items.type.toLocaleLowerCase() === 'array') {
+          resfinalKey = getKey(reskey[resfinalKey].properties.data)
+        }
+      } else {
+        if (reskey.$ref) {
+          resfinalKey = reskey.$ref.substr(14, reskey.$ref.length)
+        } else {
+          resfinalKey = ''
+        }
+      }
+      return resfinalKey
+    }
   }
   // 检测目录是否存在，并创建文件
   readDirAndCreateFile({
@@ -185,43 +226,112 @@ function parseInterFaceJson(val, fileName, clear) {
   })
   // 生成html
   // createApiJsonFileToHtml(root, fileName, clear, obj)
+  createApiJsonFileToTable(root, fileName, clear, obj)
+}
+// 生成table
+function createApiJsonFileToTable (root, fileName, clear, obj) {
+  // 检测目录是否存在，并创建文件
+let html = `${
+  Object.values(obj).map((item) => {
+    return `
+    ${
+      Object.keys(item.interface).map((interfaceitem)=>{
+        return `
+        <pre>${interfaceitem}</pre>
+        <template>
+          <div class="col-sm-12">
+          <zkt-table
+          class="table-bordered"
+          :columns="columns"
+          :data="data"
+        />
+        <zkt-page
+          :totalNum="totalNum"
+          :pageVal="pageVal"
+          :pageSize="pageSize"
+          :totalPage="totalPage"
+          @page-list-fn="pageListFn"
+        ></zkt-page>
+          </div>
+        <template>
+        <script>
+          export default {
+            name: '${interfaceitem}',
+            data () {
+              return {
+                columns: ${JSON.stringify(item.interface[interfaceitem].columns, "", "\t")},
+                data: [],
+                totalNum: 0,
+                pageVal: 1,
+                totalPage: 1
+              }
+            },
+            methods: {
+              pageListFn (obj) {
+                if (obj.page) {
+                  this.pageVal = obj.page
+                }
+              }
+            }
+          }
+        </script>
+        <style scoped>
+        </style>`
+      }).join('{||||}')
+    }`
+  }).join('{||||}')
+}`
+  html.split('{||||}').map((item) => {
+    let key = item.match(/<pre>(.*?)<\/pre>/gi)
+    if (key !== null) {
+      let vuefielname = key[0].replace(/<\/?pre>/gi, '').substr(1).replace(/\//gi, '-')
+      console.log(vuefielname, 'vuefielname')
+      readDirAndCreateFile({
+        root: path.join(root).replace(/json/gi, 'vue-table'),
+        filename: vuefielname,
+        data: item.replace(/<pre>(.*?)<\/pre>/gi, ''),
+        clear: clear ? clear : false,
+        type: '.vue'
+      })
+    }
+  })
 }
 // 生成html
 function createApiJsonFileToHtml (root, fileName, clear, obj) {
   // 检测目录是否存在，并创建文件
 let html = `${
-    Object.values(obj).map((item) => {
-      return `
-          ${
-            Object.keys(item.interface).map((interfaceitem)=>{
-              return `
-                  <pre>${interfaceitem}</pre>
-                  <template>
-                    <div class="col-sm-12">
-                      <zkt-form2
-                      :fileds="fields"
-                      v-model="model"
-                      >
-                      </zkt-form2>
-                    </div>
-                  <template>
-                  <script>
-                    export default {
-                      name: '${interfaceitem}',
-                      data () {
-                        return {
-                          fields: ${JSON.stringify(item.interface[interfaceitem].fields, "", "\t")},
-                          model: ${JSON.stringify(item.interface[interfaceitem].model, "", "\t")}
-                        }
-                      }
-                    }
-                    </script>
-                    <style scoped>
-                    </style>`
-            }).join('{||||}')
-          }`
-    }).join('{||||}')
-  }`
+  Object.values(obj).map((item) => {
+    return `
+    ${
+      Object.keys(item.interface).map((interfaceitem)=>{
+        return `
+        <pre>${interfaceitem}</pre>
+        <template>
+          <div class="col-sm-12">
+            <zkt-form2
+            :fileds="fields"
+            v-model="model"
+            >
+            </zkt-form2>
+          </div>
+        <template>
+        <script>
+          export default {
+            name: '${interfaceitem}',
+            data () {
+              return {
+                fields: ${JSON.stringify(item.interface[interfaceitem].fields, "", "\t")},
+                model: ${JSON.stringify(item.interface[interfaceitem].model, "", "\t")}
+              }
+            }
+          }
+        </script>
+        <style scoped>
+        </style>`
+      }).join('{||||}')
+    }`
+  }).join('{||||}')
+}`
   html.split('{||||}').map((item) => {
     let key = item.match(/<pre>(.*?)<\/pre>/gi)
     if (key !== null) {
@@ -257,3 +367,6 @@ statDir({
   clear: false
 })
 createApiJsonFile(apiConfig)
+
+
+
